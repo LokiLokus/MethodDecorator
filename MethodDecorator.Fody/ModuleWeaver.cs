@@ -17,8 +17,20 @@ public partial class ModuleWeaver : BaseModuleWeaver
     TypeDefinition activatorTypeRef;
     TypeDefinition attributeTypeRef;
 
+    public List<AssemblyDefinition> AssemblyDefinitions { get; set; } = new List<AssemblyDefinition>();
+
     public override void Execute()
     {
+        LogInfo("*******");
+        
+        foreach (AssemblyNameReference moduleDefinitionAssemblyReference in ModuleDefinition.AssemblyReferences)
+        {
+            var t = ModuleDefinition.AssemblyResolver.Resolve(moduleDefinitionAssemblyReference);
+            AssemblyDefinitions.Add(t);
+            LogInfo(moduleDefinitionAssemblyReference.FullName);
+
+        }
+    
         methodBaseTypeRef = ModuleDefinition.ImportReference(FindType("System.Reflection.MethodBase"));
         exceptionTypeRef = ModuleDefinition.ImportReference(FindType("System.Exception"));
         objectTypeRef = ModuleDefinition.ImportReference(TypeSystem.ObjectDefinition);
@@ -30,6 +42,8 @@ public partial class ModuleWeaver : BaseModuleWeaver
 
         DecorateAttributedByImplication();
         DecorateByType();
+        LogInfo("*******");
+        
     }
 
     public override IEnumerable<string> GetAssembliesForScanning()
@@ -232,7 +246,20 @@ public partial class ModuleWeaver : BaseModuleWeaver
 
         if (ModuleDefinition.Runtime >= TargetRuntime.Net_4_0)
         {
-            res.AddRange(ModuleDefinition.Types.Where(c => c.Implements("MethodDecorator.Fody.Interfaces.IMethodDecorator")));
+            //Added Search for all Attributes
+            var tmp = new List<TypeDefinition>();
+            foreach (AssemblyDefinition assemblyDefinition in AssemblyDefinitions)
+            {
+                foreach (ModuleDefinition assemblyDefinitionModule in assemblyDefinition.Modules)
+                {
+                    tmp.AddRange(assemblyDefinitionModule.Types.Where(c =>
+                        c.Implements("MethodDecorator.Fody.Interfaces.IMethodDecorator")));
+                }
+            }
+            var re = ModuleDefinition.Types.Where(c =>
+                c.Implements("MethodDecorator.Fody.Interfaces.IMethodDecorator"));
+            res.AddRange(re);
+            res.AddRange(tmp);
         }
 
         return res;
